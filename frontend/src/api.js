@@ -48,9 +48,8 @@ async function withFallback(realCall, mockCall) {
   try {
     return await realCall();
   } catch (e) {
-    // If network error (backend down), fall back to mock
-    if (!e.response) {
-      _isStatic = true;
+    // If network error (backend down) or 502/503/504 (service gateway error), fall back gracefully
+    if (!e.response || [502, 503, 504].includes(e.response.status)) {
       return mockCall();
     }
     throw e;
