@@ -4,7 +4,9 @@
 
 ## 🚀 Live Demo
 
-**Public URL (Tunnel):** _Run `start-demo.bat` to get a live public URL_
+🌐 **Live on Render:** [https://blockchain-agri-supply-chain-main.onrender.com](https://blockchain-agri-supply-chain-main.onrender.com)
+
+**Public URL (Tunnel):** _Run `start-demo.bat` for local mobile tunnel testing_
 
 **Demo Login:**
 - Email: `demo@agrichain.com`
