@@ -3,6 +3,16 @@ import cv2, numpy as np
 
 app=FastAPI(title="AgriChain AI Quality Service")
 
+@app.get("/")
+def root():
+    return {
+        "service": "AgriChain AI Quality Service",
+        "status": "online",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "endpoints": ["/health", "/assess"]
+    }
+
 @app.get("/health")
 def health(): return {"ok": True, "service": "quality-ai"}
 
