@@ -1,4 +1,4 @@
-import db from "./db.js";
+import db, { isMongoConnected, User, Batch, BatchEvent, mongoose } from "./db.js";
 import crypto from "crypto";
 
 function hashPassword(password) {
@@ -7,29 +7,12 @@ function hashPassword(password) {
   return `${salt}:${hash}`;
 }
 
-try {
-  db.exec("ALTER TABLE batches ADD COLUMN user_id TEXT REFERENCES users(id);");
-} catch (e) {
-  // Column already exists
-}
-
-// Clean existing tables in proper FK order to prevent conflicts
-db.prepare("DELETE FROM batch_events").run();
-db.prepare("DELETE FROM batches").run();
-
-// 1. Create Demo User
 const demoUserId = "usr-harsh-damani-001";
 const now = new Date().toISOString();
 const demoEmail = "demo@agrichain.com";
 const passwordHash = hashPassword("password123");
 
-db.prepare(`
-  INSERT OR REPLACE INTO users (id, name, email, password_hash, role, created_at)
-  VALUES (?, ?, ?, ?, ?, ?)
-`).run(demoUserId, "Harsh Damani", demoEmail, passwordHash, "Farmer", now);
-
-// 2. Demo Batches across all supply-chain stages
-const batches = [
+const demoBatches = [
   {
     id: "batch-mango-ratnagiri",
     farmer: "Harsh Damani",
@@ -117,20 +100,84 @@ const batches = [
   }
 ];
 
-for (const b of batches) {
-  db.prepare(`
-    INSERT INTO batches (id, farmer, crop, quantity, location, status, harvest_score, delivery_score, user_id, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(b.id, b.farmer, b.crop, b.quantity, b.location, b.status, b.harvest_score, b.delivery_score, b.user_id, b.created_at);
+async function seed() {
+  if (isMongoConnected()) {
+    console.log("Seeding MongoDB database...");
+    await BatchEvent.deleteMany({});
+    await Batch.deleteMany({});
+    await User.deleteMany({ email: demoEmail });
 
-  for (const ev of b.events) {
-    const evTime = new Date(Date.now() - ev.daysAgo * 86400000 + 3600000).toISOString();
-    db.prepare(`
-      INSERT INTO batch_events (batch_id, status, description, created_at)
-      VALUES (?, ?, ?, ?)
-    `).run(b.id, ev.status, ev.desc, evTime);
+    await User.create({
+      id: demoUserId,
+      name: "Harsh Damani",
+      email: demoEmail,
+      password_hash: passwordHash,
+      role: "Farmer",
+      created_at: now,
+    });
+
+    for (const b of demoBatches) {
+      await Batch.create({
+        id: b.id,
+        farmer: b.farmer,
+        crop: b.crop,
+        quantity: b.quantity,
+        location: b.location,
+        status: b.status,
+        harvest_score: b.harvest_score,
+        delivery_score: b.delivery_score,
+        user_id: b.user_id,
+        created_at: b.created_at,
+      });
+
+      for (const ev of b.events) {
+        const evTime = new Date(Date.now() - ev.daysAgo * 86400000 + 3600000).toISOString();
+        await BatchEvent.create({
+          batch_id: b.id,
+          status: ev.status,
+          description: ev.desc,
+          created_at: evTime,
+        });
+      }
+    }
+    console.log("MongoDB seeded successfully!");
+    await mongoose.disconnect();
+    return;
   }
+
+  // SQLite Seeding
+  console.log("Seeding SQLite database...");
+  try {
+    db.exec("ALTER TABLE batches ADD COLUMN user_id TEXT REFERENCES users(id);");
+  } catch (e) {
+    // Column already exists
+  }
+
+  db.prepare("DELETE FROM batch_events").run();
+  db.prepare("DELETE FROM batches").run();
+
+  db.prepare(`
+    INSERT OR REPLACE INTO users (id, name, email, password_hash, role, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(demoUserId, "Harsh Damani", demoEmail, passwordHash, "Farmer", now);
+
+  for (const b of demoBatches) {
+    db.prepare(`
+      INSERT INTO batches (id, farmer, crop, quantity, location, status, harvest_score, delivery_score, user_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(b.id, b.farmer, b.crop, b.quantity, b.location, b.status, b.harvest_score, b.delivery_score, b.user_id, b.created_at);
+
+    for (const ev of b.events) {
+      const evTime = new Date(Date.now() - ev.daysAgo * 86400000 + 3600000).toISOString();
+      db.prepare(`
+        INSERT INTO batch_events (batch_id, status, description, created_at)
+        VALUES (?, ?, ?, ?)
+      `).run(b.id, ev.status, ev.desc, evTime);
+    }
+  }
+
+  console.log("Successfully seeded 5 realistic demo batches and demo user (demo@agrichain.com / password123) in SQLite!");
+  db.close();
 }
 
-console.log(`✅ Successfully seeded 5 realistic demo batches and demo user (demo@agrichain.com / password123)!`);
-db.close();
+seed().catch(console.error);

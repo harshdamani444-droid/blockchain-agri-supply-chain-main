@@ -27,3 +27,5 @@ services:
           type: web
           name: agrichain-ai
           property: host
+      - key: MONGODB_URI
+        sync: false

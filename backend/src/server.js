@@ -5,7 +5,7 @@ import axios from "axios";
 import dotenv from "dotenv";
 import { v4 as uuid } from "uuid";
 import { ethers } from "ethers";
-import { pool } from "./db.js";
+import { pool, isMongoConnected } from "./db.js";
 
 import crypto from "crypto";
 
@@ -16,8 +16,6 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(",") || "*" }));
 app.use(express.json());
-
-app.get("/health", (_req, res) => res.json({ ok: true, service: "agri-backend" }));
 
 // ── Password hashing utilities ──
 function hashPassword(password) {
@@ -66,7 +64,11 @@ const STATUS_FLOW = [
 
 // ── Health ──
 app.get("/health", (_req, res) =>
-  res.json({ ok: true, service: "agri-chain-api" })
+  res.json({
+    ok: true,
+    service: "agri-chain-api",
+    database: isMongoConnected() ? "MongoDB Atlas" : "SQLite",
+  })
 );
 
 // ── Auth Endpoints ──

@@ -1,46 +1,61 @@
-import db from "./db.js";
+import db, { isMongoConnected, User, Batch, BatchEvent, mongoose } from "./db.js";
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users(
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    role TEXT DEFAULT 'Farmer',
-    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-  );
-`);
+async function init() {
+  if (isMongoConnected()) {
+    console.log("Initializing MongoDB collections and indexes...");
+    await User.syncIndexes();
+    await Batch.syncIndexes();
+    await BatchEvent.syncIndexes();
+    console.log("Database initialized with User, Batch, and BatchEvent schemas (MongoDB Atlas)");
+    await mongoose.disconnect();
+    return;
+  }
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS batches(
-    id TEXT PRIMARY KEY,
-    farmer TEXT NOT NULL,
-    crop TEXT NOT NULL,
-    quantity REAL NOT NULL,
-    location TEXT,
-    status TEXT DEFAULT 'HARVESTED',
-    harvest_score REAL,
-    delivery_score REAL,
-    user_id TEXT REFERENCES users(id),
-    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-  );
-`);
+  // SQLite Initialization
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users(
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      role TEXT DEFAULT 'Farmer',
+      created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    );
+  `);
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS batch_events(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    batch_id TEXT REFERENCES batches(id) ON DELETE CASCADE,
-    status TEXT NOT NULL,
-    description TEXT,
-    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-  );
-`);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS batches(
+      id TEXT PRIMARY KEY,
+      farmer TEXT NOT NULL,
+      crop TEXT NOT NULL,
+      quantity REAL NOT NULL,
+      location TEXT,
+      status TEXT DEFAULT 'HARVESTED',
+      harvest_score REAL,
+      delivery_score REAL,
+      user_id TEXT REFERENCES users(id),
+      created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    );
+  `);
 
-try {
-  db.exec("ALTER TABLE batches ADD COLUMN user_id TEXT REFERENCES users(id);");
-} catch (e) {
-  // Column already exists
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS batch_events(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      batch_id TEXT REFERENCES batches(id) ON DELETE CASCADE,
+      status TEXT NOT NULL,
+      description TEXT,
+      created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    );
+  `);
+
+  try {
+    db.exec("ALTER TABLE batches ADD COLUMN user_id TEXT REFERENCES users(id);");
+  } catch (e) {
+    // Column already exists
+  }
+
+  console.log("Database initialized with users, batches, and batch_events tables (SQLite)");
+  db.close();
 }
 
-console.log("Database initialized with users, batches, and batch_events tables (SQLite)");
-db.close();
+init().catch(console.error);
