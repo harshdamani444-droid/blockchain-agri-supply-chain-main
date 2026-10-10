@@ -1,4 +1,16 @@
 services:
+  # 1. AI Quality Computer-Vision Service (Python FastAPI)
+  - type: web
+    name: agrichain-ai
+    runtime: python
+    rootDir: ai-service
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+
+  # 2. Main Web App: Express REST API & React Frontend
   - type: web
     name: agrichain-backend
     runtime: node
@@ -8,7 +20,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: AI_SERVICE_URL
-        value: http://localhost:8000
       - key: PORT
         value: 4000
+      - key: AI_SERVICE_URL
+        fromService:
+          type: web
+          name: agrichain-ai
+          property: host
