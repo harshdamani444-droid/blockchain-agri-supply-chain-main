@@ -1,7 +1,7 @@
-FROM node:22-alpine
+FROM node:20-slim
 WORKDIR /app
-COPY package*.json ./
+COPY backend/package*.json package*.json* ./
 RUN npm install
-COPY . .
+COPY backend/ ./
 EXPOSE 4000
 CMD ["npm","start"]
